@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { useData } from '@/context/DataContext';
-import type { ItemType, Course } from '@/types';
+import type { ItemType } from '@/types';
 import { ITEM_TYPE_COLORS, ITEM_TYPE_LABELS } from '@/types';
 import { Plus, Check, Trash2, X, Calendar } from 'lucide-react';
 
 interface TaskListProps {
   courseId?: string;
   title?: string;
+  accentColor?: string;
 }
 
-export default function TaskList({ courseId, title = 'Master To-Do List' }: TaskListProps) {
+export default function TaskList({ courseId, title = 'Master To-Do List', accentColor = '#22d3ee' }: TaskListProps) {
   const { tasks, courses, addTask, toggleTask, deleteTask } = useData();
   const [adding, setAdding] = useState(false);
   const [taskTitle, setTitle] = useState('');
@@ -38,7 +39,8 @@ export default function TaskList({ courseId, title = 'Master To-Do List' }: Task
         <h3 className="text-sm font-semibold text-white">{title}</h3>
         <button
           onClick={() => setAdding(!adding)}
-          className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+          style={{ color: accentColor }}
+          className="flex items-center gap-1 text-xs transition-colors hover:brightness-125"
         >
           {adding ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
           {adding ? 'Cancel' : 'Add Task'}
@@ -65,7 +67,8 @@ export default function TaskList({ courseId, title = 'Master To-Do List' }: Task
             />
             <button
               onClick={handleAdd}
-              className="px-3 py-1.5 bg-cyan-500 text-white text-xs rounded-lg hover:bg-cyan-400 transition-colors"
+              style={{ backgroundColor: accentColor }}
+              className="px-3 py-1.5 text-white text-xs rounded-lg transition-colors hover:brightness-110"
             >
               Add
             </button>
@@ -83,16 +86,18 @@ export default function TaskList({ courseId, title = 'Master To-Do List' }: Task
           return (
             <div
               key={t.id}
+              style={course && !t.completed ? { backgroundColor: `${course.color}1a` } : undefined}
               className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
                 t.completed ? 'bg-emerald-500/5' : 'bg-white/[0.02] hover:bg-white/5'
               }`}
             >
               <button
                 onClick={() => toggleTask(t.id, !t.completed)}
+                style={!t.completed ? { borderColor: accentColor } : undefined}
                 className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shrink-0 ${
                   t.completed
                     ? 'bg-emerald-500 border-emerald-500'
-                    : 'border-gray-600 hover:border-cyan-500'
+                    : 'border-gray-600 hover:brightness-125'
                 }`}
               >
                 {t.completed && <Check className="w-3 h-3 text-white" strokeWidth={3} />}

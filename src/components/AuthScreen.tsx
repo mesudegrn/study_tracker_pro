@@ -7,21 +7,45 @@ export default function AuthScreen() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [semesterStartDate, setSemesterStartDate] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setNotice(null);
+    if (mode === 'signup' && !name.trim()) {
+      setError('Enter your name to create an account.');
+      return;
+    }
     setBusy(true);
-    const fn = mode === 'signin' ? signIn : signUp;
-    const { error: err } = await fn(email, password);
-    setBusy(false);
-    if (err) {
-      setError(err);
-    } else if (mode === 'signup') {
-      setError('Account created! You can now sign in.');
-      setMode('signin');
+    try {
+      if (mode === 'signup') {
+        const result = await signUp(email, password, name, semesterStartDate);
+        if (result.error) {
+          console.error('Sign-up failed:', result.error);
+          setError(result.error);
+        } else if (result.requiresEmailConfirmation) {
+          setNotice('Account created. Check your email to confirm it, then sign in.');
+          setMode('signin');
+        } else {
+          setNotice('Account created and signed in.');
+        }
+      } else {
+        const result = await signIn(email, password);
+        if (result.error) {
+          console.error('Sign-in failed:', result.error);
+          setError(result.error);
+        }
+      }
+    } catch (submitError) {
+      console.error('Authentication request failed:', submitError);
+      setError(submitError instanceof Error ? submitError.message : 'Authentication failed. Please try again.');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -68,6 +92,21 @@ export default function AuthScreen() {
                 placeholder="you@university.edu"
               />
             </div>
+            {mode === 'signup' && (
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1.5">Name</label>
+                <input
+                  type="text"
+                  required
+                  maxLength={80}
+                  autoComplete="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all"
+                  placeholder="Your name"
+                />
+              </div>
+            )}
             <div>
               <label className="block text-xs font-medium text-gray-400 mb-1.5">Password</label>
               <input
@@ -80,10 +119,21 @@ export default function AuthScreen() {
                 placeholder="••••••••"
               />
             </div>
-
-            {error && (
-              <p className={`text-sm ${error.includes('created') ? 'text-emerald-400' : 'text-red-400'}`}>{error}</p>
+            {mode === 'signup' && (
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1.5">Semester Start Date</label>
+                <input
+                  type="date"
+                  required
+                  value={semesterStartDate}
+                  onChange={(e) => setSemesterStartDate(e.target.value)}
+                  className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 transition-all"
+                />
+              </div>
             )}
+
+            {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
+            {notice && <p role="status" className="text-sm text-emerald-400">{notice}</p>}
 
             <button
               type="submit"

@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { X } from 'lucide-react';
+import { COURSE_COLORS } from '@/types';
 
-const COLORS = ['#22d3ee', '#34d399', '#f59e0b', '#f472b6', '#a78bfa', '#fb7185', '#60a5fa', '#fbbf24'];
+const COLORS = COURSE_COLORS;
 
 interface Props {
   userId: string;
@@ -13,19 +14,23 @@ interface Props {
 export default function CourseQuickAdd({ userId, onDone, onCancel }: Props) {
   const [name, setName] = useState('');
   const [color, setColor] = useState(COLORS[0]);
-  const [examDate, setExamDate] = useState('');
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
   const save = async () => {
     if (!name.trim()) return;
     setBusy(true);
-    await supabase.from('courses').insert({
+    setError('');
+    const { error: insertError } = await supabase.from('courses').insert({
       user_id: userId,
       name: name.trim(),
       color,
-      exam_date: examDate || null,
     });
     setBusy(false);
+    if (insertError) {
+      setError(insertError.message);
+      return;
+    }
     onDone();
   };
 
@@ -47,24 +52,22 @@ export default function CourseQuickAdd({ userId, onDone, onCancel }: Props) {
           className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-cyan-500/50 transition-all"
           autoFocus
         />
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">Color:</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-xs text-gray-500">Color:</span>
           {COLORS.map((c) => (
             <button
               key={c}
+              type="button"
+              aria-label={`Choose course color ${c}`}
+              aria-pressed={color === c}
               onClick={() => setColor(c)}
               className={`w-6 h-6 rounded-full transition-all ${color === c ? 'ring-2 ring-white ring-offset-2 ring-offset-[#16161f]' : ''}`}
               style={{ backgroundColor: c }}
             />
           ))}
         </div>
-        <div className="flex gap-2">
-          <input
-            type="date"
-            value={examDate}
-            onChange={(e) => setExamDate(e.target.value)}
-            className="flex-1 bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-cyan-500/50 transition-all"
-          />
+        {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
+        <div className="flex justify-end">
           <button
             onClick={save}
             disabled={busy || !name.trim()}

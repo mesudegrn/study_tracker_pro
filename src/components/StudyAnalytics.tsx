@@ -1,16 +1,18 @@
 import { useMemo, useState } from 'react';
 import type { StudyLog, Course } from '@/types';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
-import { formatMinutes } from '@/lib/utils';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { formatMinutes, localDateString } from '@/lib/utils';
 
 interface Props {
   logs: StudyLog[];
   courses: Course[];
+  hideCoursePie?: boolean;
+  accentColor?: string;
 }
 
 const NEON_COLORS = ['#22d3ee', '#34d399', '#f59e0b', '#f472b6', '#a78bfa', '#fb7185', '#60a5fa', '#fbbf24'];
 
-export default function StudyAnalytics({ logs, courses }: Props) {
+export default function StudyAnalytics({ logs, courses, hideCoursePie = false, accentColor = '#22d3ee' }: Props) {
   const [range, setRange] = useState(7);
 
   const courseMap = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses]);
@@ -35,7 +37,7 @@ export default function StudyAnalytics({ logs, courses }: Props) {
     for (let i = range - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const iso = d.toISOString().split('T')[0];
+      const iso = localDateString(d);
       days.push({
         day: d.toLocaleDateString('en-US', { weekday: 'short' }),
         date: iso,
@@ -52,7 +54,8 @@ export default function StudyAnalytics({ logs, courses }: Props) {
   const totalMinutes = logs.reduce((s, l) => s + l.minutes, 0);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div className={`grid min-w-0 gap-4 ${hideCoursePie ? 'grid-cols-1' : 'grid-cols-1 2xl:grid-cols-2'}`}>
+      {!hideCoursePie && (
       <div className="bg-[#16161f] border border-white/5 rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-semibold text-white">Study Time by Course</h3>
@@ -63,7 +66,8 @@ export default function StudyAnalytics({ logs, courses }: Props) {
             No study sessions logged yet
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={320}>
+          <div className="h-[320px] min-h-[300px] min-w-0 w-full">
+          <ResponsiveContainer width="100%" height="100%">
             <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
               <Pie
                 data={pieData}
@@ -94,6 +98,7 @@ export default function StudyAnalytics({ logs, courses }: Props) {
               />
             </PieChart>
           </ResponsiveContainer>
+          </div>
         )}
         {pieData.length > 0 && (
           <div className="flex flex-wrap gap-3 mt-4">
@@ -106,8 +111,9 @@ export default function StudyAnalytics({ logs, courses }: Props) {
           </div>
         )}
       </div>
+      )}
 
-      <div className="bg-[#16161f] border border-white/5 rounded-2xl p-5">
+      <div className={`min-w-0 bg-[#16161f] border border-white/5 rounded-2xl p-5 ${hideCoursePie ? 'w-full' : ''}`}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-semibold text-white">Study Hours per Day</h3>
           <div className="flex gap-1 bg-[#0a0a0f] rounded-lg p-0.5">
@@ -116,15 +122,17 @@ export default function StudyAnalytics({ logs, courses }: Props) {
                 key={r}
                 onClick={() => setRange(r)}
                 className={`px-3 py-1.5 text-xs rounded-md transition-all ${
-                  range === r ? 'bg-cyan-500 text-white' : 'text-gray-500 hover:text-gray-300'
+                  range === r ? 'text-white' : 'text-gray-500 hover:text-gray-300'
                 }`}
+                style={range === r ? { backgroundColor: accentColor } : undefined}
               >
                 {r}d
               </button>
             ))}
           </div>
         </div>
-        <ResponsiveContainer width="100%" height={320}>
+        <div className="h-[320px] min-h-[300px] min-w-0 w-full">
+        <ResponsiveContainer width="100%" height="100%">
           <BarChart data={barData} barCategoryGap="20%" margin={{ top: 10, right: 10, bottom: 5, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
             <XAxis dataKey="day" tick={{ fill: '#94a3b8', fontSize: 13 }} axisLine={false} tickLine={false} />
@@ -140,9 +148,10 @@ export default function StudyAnalytics({ logs, courses }: Props) {
               cursor={{ fill: 'rgba(34,211,238,0.05)' }}
               formatter={(v) => formatMinutes(Number(v))}
             />
-            <Bar dataKey="minutes" radius={[6, 6, 0, 0]} fill="#22d3ee" />
+            <Bar dataKey="minutes" radius={[6, 6, 0, 0]} fill={accentColor} />
           </BarChart>
         </ResponsiveContainer>
+        </div>
       </div>
     </div>
   );

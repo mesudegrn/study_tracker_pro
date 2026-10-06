@@ -54,6 +54,11 @@ export function formatTime(seconds: number): string {
   return `${pad(m)}:${pad(s)}`;
 }
 
+export function localDateString(date = new Date()): string {
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+}
+
 export function generateICS(tasks: { title: string; due_date: string | null }[], courses: Course[]): string {
   const lines: string[] = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//StudyTracker//EN'];
 

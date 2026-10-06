@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
 import { useProfile, useStudyLogs } from '@/hooks/useData';
-import { getCurrentWeek } from '@/lib/utils';
+import { getCurrentWeek, localDateString } from '@/lib/utils';
 import SemesterSetup from '@/components/SemesterSetup';
 import TaskList from '@/components/TaskList';
 import StudyAnalytics from '@/components/StudyAnalytics';
@@ -10,6 +10,7 @@ import CalendarWidget from '@/components/CalendarWidget';
 import SmartAlerts from '@/components/SmartAlerts';
 import UpcomingExamsQuizzes from '@/components/UpcomingExamsQuizzes';
 import CourseQuickAdd from '@/components/CourseQuickAdd';
+import ManualStudyEntry from '@/components/ManualStudyEntry';
 import { Calendar, BookOpen, Clock, Plus } from 'lucide-react';
 import type { Page } from '@/types';
 
@@ -19,25 +20,32 @@ interface DashboardProps {
 
 export default function Dashboard({ navigate }: DashboardProps) {
   const { user } = useAuth();
-  const { profile, refetch: refetchProfile } = useProfile(user?.id ?? null);
+  const { profile, refetch: refetchProfile, loading: loadingProfile } = useProfile(user?.id ?? null);
   const { tasks, courses, refetchCourses } = useData();
-  const { logs } = useStudyLogs(user?.id ?? null);
+  const { logs, refetch: refetchLogs } = useStudyLogs(user?.id ?? null);
   const [showAddCourse, setShowAddCourse] = useState(false);
 
+  if (loadingProfile) return <div className="p-6 text-sm text-gray-500">Loading your semester settings...</div>;
   if (!profile || !profile.semester_start_date) {
-    return <SemesterSetup onDone={refetchProfile} />;
+    return (
+      <SemesterSetup onDone={async () => {
+        const error = await refetchProfile();
+        if (error) throw new Error(error);
+        navigate('dashboard');
+      }} />
+    );
   }
 
   const currentWeek = getCurrentWeek(profile.semester_start_date);
   const todayMinutes = logs
-    .filter((l) => l.log_date === new Date().toISOString().split('T')[0])
+    .filter((l) => l.log_date === localDateString())
     .reduce((s, l) => s + l.minutes, 0);
   const pendingTasks = tasks.filter((t) => !t.completed).length;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Dashboard</h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -68,6 +76,8 @@ export default function Dashboard({ navigate }: DashboardProps) {
         <StatCard icon={<Clock className="w-5 h-5" />} label="Today's Study" value={`${Math.floor(todayMinutes / 60)}h ${todayMinutes % 60}m`} color="amber" />
         <StatCard icon={<BookOpen className="w-5 h-5" />} label="Pending Tasks" value={pendingTasks.toString()} color="pink" />
       </div>
+
+      <ManualStudyEntry courses={courses} onLogged={() => { void refetchLogs(); }} />
 
       {/* Smart Alerts */}
       <SmartAlerts courses={courses} materials={[]} semesterStart={profile.semester_start_date} />

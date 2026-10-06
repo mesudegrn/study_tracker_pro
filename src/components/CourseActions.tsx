@@ -1,25 +1,34 @@
 import { useState } from 'react';
 import { useData } from '@/context/DataContext';
 import type { Course } from '@/types';
+import { COURSE_COLORS } from '@/types';
 import { Pencil, Trash2, X, Check } from 'lucide-react';
 
 interface Props {
   course: Course;
   onDelete: () => void;
+  accentColor?: string;
 }
 
-export default function CourseActions({ course, onDelete }: Props) {
+export default function CourseActions({ course, onDelete, accentColor = course.color }: Props) {
   const { updateCourse, deleteCourse } = useData();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(course.name);
+  const [color, setColor] = useState(course.color);
+  const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const saveName = async () => {
-    if (!name.trim() || name.trim() === course.name) {
+    if (!name.trim()) {
       setEditing(false);
       return;
     }
-    await updateCourse(course.id, { name: name.trim() });
+    const { error } = await updateCourse(course.id, { name: name.trim(), color });
+    if (error) {
+      setError(error);
+      return;
+    }
+    setError('');
     setEditing(false);
   };
 
@@ -50,27 +59,43 @@ export default function CourseActions({ course, onDelete }: Props) {
 
   if (editing) {
     return (
-      <div className="flex items-center gap-2">
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && saveName()}
-          className="bg-[#0a0a0f] border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:border-cyan-500/50 transition-all w-48"
-          autoFocus
-        />
-        <button
-          onClick={saveName}
-          className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all"
-        >
-          <Check className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => { setEditing(false); setName(course.name); }}
-          className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 transition-all"
-        >
-          <X className="w-4 h-4" />
-        </button>
+      <div className="min-w-0 space-y-2 rounded-xl border border-white/10 bg-[#16161f] p-3">
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && void saveName()}
+            className="w-40 min-w-0 rounded-lg border border-white/10 bg-[#0a0a0f] px-3 py-1.5 text-sm text-white transition-all focus:border-cyan-500/50 focus:outline-none"
+            aria-label="Course name"
+            autoFocus
+          />
+          <button onClick={() => void saveName()} aria-label="Save course changes" className="rounded-lg bg-emerald-500/10 p-1.5 text-emerald-400 transition-all hover:bg-emerald-500/20">
+            <Check className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => { setEditing(false); setName(course.name); setColor(course.color); setError(''); }}
+            aria-label="Cancel editing"
+            className="rounded-lg bg-white/5 p-1.5 text-gray-400 transition-all hover:bg-white/10"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-[10px] text-gray-500">Color</span>
+          {COURSE_COLORS.map((option) => (
+            <button
+              key={option}
+              type="button"
+              aria-label={`Choose course color ${option}`}
+              aria-pressed={color === option}
+              onClick={() => setColor(option)}
+              className={`h-5 w-5 rounded-full ${color === option ? 'ring-2 ring-white ring-offset-2 ring-offset-[#16161f]' : ''}`}
+              style={{ backgroundColor: option }}
+            />
+          ))}
+        </div>
+        {error && <p role="alert" className="text-xs text-red-400">{error}</p>}
       </div>
     );
   }
@@ -78,11 +103,11 @@ export default function CourseActions({ course, onDelete }: Props) {
   return (
     <div className="flex items-center gap-1">
       <button
-        onClick={() => setEditing(true)}
+        onClick={() => { setName(course.name); setColor(course.color); setEditing(true); }}
         className="p-1.5 rounded-lg text-gray-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all"
-        title="Edit course name"
+        title="Edit course name and color"
       >
-        <Pencil className="w-4 h-4" />
+        <Pencil className="w-4 h-4" style={{ color: accentColor }} />
       </button>
       <button
         onClick={() => setConfirmDelete(true)}
