@@ -6,7 +6,9 @@ import { useProfile } from '@/hooks/useData';
 import { getCurrentWeek, materialProgress, weekProgress, formatMinutes } from '@/lib/utils';
 import PomodoroTimer from '@/components/PomodoroTimer';
 import StudyAnalytics from '@/components/StudyAnalytics';
+import StudySessionHistory from '@/components/StudySessionHistory';
 import TaskList from '@/components/TaskList';
+import ManualStudyEntry from '@/components/ManualStudyEntry';
 import CourseActions from '@/components/CourseActions';
 import { ArrowLeft, Trash2, BookOpen, ChevronRight, ChevronDown, Sparkles, Plus } from 'lucide-react';
 import type { Page, Course, Material } from '@/types';
@@ -20,8 +22,8 @@ export default function CourseDetail({ course, navigate }: Props) {
   const { user } = useAuth();
   const { profile } = useProfile(user?.id ?? null);
   const { materials, refetch: refetchMaterials } = useMaterials(course.id);
-  const { logs, refetch: refetchLogs } = useStudyLogs(user?.id ?? null);
-  const [expandedWeek, setExpandedWeek] = useState<number | null>(null);
+  const { logs, refetch: refetchLogs, deleteLog } = useStudyLogs(user?.id ?? null);
+  const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(() => new Set());
   const [showAddMaterial, setShowAddMaterial] = useState(false);
   const [newMaterial, setNewMaterial] = useState({ title: '', total: '', week: '' });
 
@@ -30,8 +32,10 @@ export default function CourseDetail({ course, navigate }: Props) {
   const totalMinutes = courseLogs.reduce((s, l) => s + l.minutes, 0);
 
   useEffect(() => {
-    if (currentWeek > 0 && expandedWeek === null) setExpandedWeek(currentWeek);
-  }, [currentWeek, expandedWeek]);
+    if (currentWeek > 0) {
+      setExpandedWeeks((weeks) => weeks.has(currentWeek) ? weeks : new Set(weeks).add(currentWeek));
+    }
+  }, [currentWeek]);
 
   const allWeeks = Array.from(new Set(materials.map((m) => m.week_number))).sort((a, b) => a - b);
 
@@ -51,7 +55,7 @@ export default function CourseDetail({ course, navigate }: Props) {
     });
     setNewMaterial({ title: '', total: '', week: '' });
     setShowAddMaterial(false);
-    setExpandedWeek(parseInt(newMaterial.week));
+    setExpandedWeeks((weeks) => new Set(weeks).add(parseInt(newMaterial.week)));
     refetchMaterials();
   };
 
@@ -65,16 +69,17 @@ export default function CourseDetail({ course, navigate }: Props) {
     : null;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-3 sm:gap-4">
         <button
           onClick={() => navigate('dashboard')}
+          style={{ color: course.color }}
           className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-all"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full" style={{ backgroundColor: course.color }} />
             <h1 className="text-2xl font-bold text-white tracking-tight">{course.name}</h1>
@@ -84,42 +89,36 @@ export default function CourseDetail({ course, navigate }: Props) {
             {currentWeek > 0 && ` · Week ${currentWeek}`}
           </p>
         </div>
-        <CourseActions course={course} onDelete={() => navigate('dashboard')} />
+        <CourseActions course={course} onDelete={() => navigate('dashboard')} accentColor={course.color} />
         {examCountdown !== null && (
           <div className={`px-4 py-2.5 rounded-xl border ${
             examCountdown <= 7
               ? 'bg-red-500/10 border-red-500/20 text-red-400'
               : examCountdown <= 30
                 ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-                : 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400'
+                : 'bg-cyan-500/10 border-cyan-500/20'
           }`}>
-            <p className="text-xs opacity-70">Exam Countdown</p>
-            <p className="text-lg font-bold">
+            <p className="text-xs opacity-70" style={examCountdown > 30 ? { color: course.color } : undefined}>Exam Countdown</p>
+            <p className="text-lg font-bold" style={examCountdown > 30 ? { color: course.color } : undefined}>
               {examCountdown > 0 ? `${examCountdown} days` : examCountdown === 0 ? 'Today!' : 'Past'}
             </p>
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Timer + Analytics + Tasks */}
-        <div className="space-y-4">
-          <PomodoroTimer courseId={course.id} courseName={course.name} onLogged={refetchLogs} />
-          <StudyAnalytics logs={courseLogs} courses={[course]} />
-          <TaskList courseId={course.id} title={`${course.name} Tasks`} />
-        </div>
-
-        {/* Right: Materials by week */}
-        <div className="lg:col-span-2 space-y-4">
+      <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3 lg:gap-6">
+        <div className="min-w-0 space-y-4 lg:col-span-2">
+          <StudyAnalytics logs={courseLogs} courses={[course]} hideCoursePie accentColor={course.color} />
           <div className="bg-[#16161f] border border-white/5 rounded-2xl p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-cyan-400" />
+                <BookOpen className="w-4 h-4" style={{ color: course.color }} />
                 <h3 className="text-sm font-semibold text-white">Material Tracking by Week</h3>
               </div>
               <button
                 onClick={() => setShowAddMaterial(!showAddMaterial)}
-                className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+                style={{ color: course.color }}
+                className="flex items-center gap-1 text-xs transition-colors hover:brightness-125"
               >
                 <Plus className="w-4 h-4" />
                 Add Material
@@ -156,7 +155,8 @@ export default function CourseDetail({ course, navigate }: Props) {
                   />
                   <button
                     onClick={addMaterial}
-                    className="px-3 py-1.5 bg-cyan-500 text-white text-xs rounded-lg hover:bg-cyan-400 transition-colors"
+                    style={{ backgroundColor: course.color }}
+                    className="px-3 py-1.5 text-xs text-white rounded-lg transition-colors hover:brightness-110"
                   >
                     Add
                   </button>
@@ -172,7 +172,7 @@ export default function CourseDetail({ course, navigate }: Props) {
               {allWeeks.map((week) => {
                 const weekMats = materials.filter((m) => m.week_number === week);
                 const pct = weekProgress(materials, week);
-                const isExpanded = expandedWeek === week;
+                const isExpanded = expandedWeeks.has(week);
                 const isCurrent = week === currentWeek;
 
                 return (
@@ -180,12 +180,18 @@ export default function CourseDetail({ course, navigate }: Props) {
                     key={week}
                     className={`rounded-xl border transition-all ${
                       isCurrent
-                        ? 'bg-cyan-500/5 border-cyan-500/20'
+                        ? 'border-white/10'
                         : 'bg-white/[0.02] border-white/5'
                     }`}
+                    style={isCurrent ? { backgroundColor: `${course.color}0d`, borderColor: `${course.color}35` } : undefined}
                   >
                     <button
-                      onClick={() => setExpandedWeek(isExpanded ? null : week)}
+                      onClick={() => setExpandedWeeks((weeks) => {
+                        const next = new Set(weeks);
+                        if (next.has(week)) next.delete(week);
+                        else next.add(week);
+                        return next;
+                      })}
                       className="w-full flex items-center gap-3 px-4 py-3"
                     >
                       {isExpanded
@@ -193,7 +199,7 @@ export default function CourseDetail({ course, navigate }: Props) {
                         : <ChevronRight className="w-4 h-4 text-gray-500" />}
                       <div className="flex-1 text-left">
                         <span className="text-sm font-medium text-white">Week {week}</span>
-                        {isCurrent && <span className="ml-2 text-[10px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">Current</span>}
+                        {isCurrent && <span className="ml-2 rounded px-1.5 py-0.5 text-[10px]" style={{ color: course.color, backgroundColor: `${course.color}1a` }}>Current</span>}
                       </div>
                       {pct >= 0 && (
                         <div className="flex items-center gap-2">
@@ -285,6 +291,12 @@ export default function CourseDetail({ course, navigate }: Props) {
             </div>
           </div>
         </div>
+        <aside className="min-w-0 space-y-4">
+          <PomodoroTimer courseId={course.id} courseName={course.name} onLogged={() => { void refetchLogs(); }} accentColor={course.color} />
+          <ManualStudyEntry courses={[course]} initialCourseId={course.id} onLogged={() => { void refetchLogs(); }} accentColor={course.color} />
+          <TaskList courseId={course.id} title={`${course.name} Tasks`} accentColor={course.color} />
+          <StudySessionHistory logs={courseLogs} onDelete={deleteLog} accentColor={course.color} />
+        </aside>
       </div>
     </div>
   );

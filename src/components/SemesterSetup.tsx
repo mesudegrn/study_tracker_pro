@@ -1,23 +1,46 @@
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { useProfile } from '@/hooks/useData';
 import { supabase } from '@/lib/supabase';
 import { Calendar, ChevronRight } from 'lucide-react';
 
-export default function SemesterSetup({ onDone }: { onDone: () => void }) {
+export default function SemesterSetup({ onDone }: { onDone: () => Promise<void> | void }) {
   const { user } = useAuth();
   const [date, setDate] = useState('');
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSave = async () => {
-    if (!user || !date) return;
+    if (!user) {
+      const message = 'Your session is not ready. Please sign in again.';
+      console.error(message);
+      setError(message);
+      return;
+    }
+    if (!date) {
+      setError('Choose your semester start date to continue.');
+      return;
+    }
     setBusy(true);
-    await supabase.from('profiles').upsert({
-      user_id: user.id,
-      semester_start_date: date,
-    });
-    setBusy(false);
-    onDone();
+    setError('');
+    try {
+      const { error: saveError } = await supabase.from('profiles').upsert({
+        user_id: user.id,
+        full_name: typeof user.user_metadata.full_name === 'string' ? user.user_metadata.full_name : null,
+        semester_start_date: date,
+        updated_at: new Date().toISOString(),
+      });
+      if (saveError) {
+        console.error('Unable to save semester setup:', saveError.message);
+        setError(`Could not save your semester settings: ${saveError.message}`);
+        return;
+      }
+      await onDone();
+    } catch (saveError) {
+      console.error('Semester setup failed:', saveError);
+      setError(saveError instanceof Error ? saveError.message : 'Could not save your semester settings.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -45,6 +68,7 @@ export default function SemesterSetup({ onDone }: { onDone: () => void }) {
             />
           </div>
 
+          {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
           <button
             onClick={handleSave}
             disabled={busy || !date}

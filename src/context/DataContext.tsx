@@ -14,7 +14,7 @@ interface DataContextValue {
   addTask: (input: { title: string; due_date?: string | null; course_id?: string | null; item_type?: ItemType }) => Promise<void>;
   toggleTask: (id: string, completed: boolean) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
-  updateCourse: (id: string, updates: Partial<Pick<Course, 'name' | 'color' | 'exam_date'>>) => Promise<void>;
+  updateCourse: (id: string, updates: Partial<Pick<Course, 'name' | 'color' | 'exam_date'>>) => Promise<{ error: string | null }>;
   deleteCourse: (id: string) => Promise<void>;
 }
 
@@ -28,16 +28,26 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [loadingCourses, setLoadingCourses] = useState(true);
 
   const refetchTasks = useCallback(async () => {
-    if (!user) return;
-    const { data } = await supabase.from('tasks').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
-    setTasks(data ?? []);
+    if (!user) {
+      setTasks([]);
+      setLoadingTasks(false);
+      return;
+    }
+    const { data, error } = await supabase.from('tasks').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+    if (error) console.error('Unable to load tasks:', error.message);
+    else setTasks(data ?? []);
     setLoadingTasks(false);
   }, [user]);
 
   const refetchCourses = useCallback(async () => {
-    if (!user) return;
-    const { data } = await supabase.from('courses').select('*').eq('user_id', user.id).order('created_at');
-    setCourses(data ?? []);
+    if (!user) {
+      setCourses([]);
+      setLoadingCourses(false);
+      return;
+    }
+    const { data, error } = await supabase.from('courses').select('*').eq('user_id', user.id).order('created_at');
+    if (error) console.error('Unable to load courses:', error.message);
+    else setCourses(data ?? []);
     setLoadingCourses(false);
   }, [user]);
 
@@ -69,8 +79,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [refetchTasks]);
 
   const updateCourse = useCallback(async (id: string, updates: Partial<Pick<Course, 'name' | 'color' | 'exam_date'>>) => {
-    await supabase.from('courses').update(updates).eq('id', id);
+    const { error } = await supabase.from('courses').update(updates).eq('id', id);
+    if (error) return { error: error.message };
     refetchCourses();
+    return { error: null };
   }, [refetchCourses]);
 
   const deleteCourse = useCallback(async (id: string) => {

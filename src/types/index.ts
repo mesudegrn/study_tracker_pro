@@ -1,5 +1,6 @@
 export interface Profile {
   user_id: string;
+  full_name: string | null;
   semester_start_date: string | null;
   created_at: string;
 }
@@ -57,8 +58,16 @@ export interface StudyLog {
   course_id: string | null;
   log_date: string;
   minutes: number;
+  duration_seconds: number | null;
+  session_title: string | null;
   mode: string;
   created_at: string;
 }
 
-export type Page = 'dashboard' | 'matrix' | { type: 'course'; courseId: string };
+export const COURSE_COLORS = [
+  '#22d3ee', '#34d399', '#f59e0b', '#f472b6',
+  '#a78bfa', '#fb7185', '#60a5fa', '#fbbf24',
+  '#2dd4bf', '#c084fc', '#fb923c', '#4ade80',
+];
+
+export type Page = 'dashboard' | 'matrix' | 'grades' | { type: 'course'; courseId: string };

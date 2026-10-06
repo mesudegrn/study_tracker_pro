@@ -6,7 +6,7 @@ interface AuthContextValue {
   session: Session | null;
   user: User | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, name: string, semesterStartDate: string) => Promise<{ error: string | null; requiresEmailConfirmation: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
@@ -18,30 +18,74 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
       setLoading(false);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-    });
+    void supabase.auth.getSession()
+      .then(({ data, error }) => {
+        if (error) console.error('Unable to restore authentication session:', error.message);
+        setSession(data.session);
+        setLoading(false);
+      })
+      .catch((error: unknown) => {
+        console.error('Unable to restore authentication session:', error);
+        setLoading(false);
+      });
 
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password });
-    return { error: error?.message ?? null };
+  const signUp = async (email: string, password: string, name: string, semesterStartDate: string) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { full_name: name.trim(), semester_start_date: semesterStartDate } },
+      });
+      if (error) {
+        console.error('Unable to create account:', error.message);
+        return { error: error.message, requiresEmailConfirmation: false };
+      }
+      if (data.session) {
+        setSession(data.session);
+        setLoading(false);
+      }
+      return { error: null, requiresEmailConfirmation: !data.session };
+    } catch (error) {
+      console.error('Unable to create account:', error);
+      return { error: error instanceof Error ? error.message : 'Unable to create account.', requiresEmailConfirmation: false };
+    }
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message ?? null };
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        console.error('Unable to sign in:', error.message);
+        return { error: error.message };
+      }
+      if (!data.session) {
+        const message = 'Sign-in succeeded, but no session was returned. Please try again.';
+        console.error(message);
+        return { error: message };
+      }
+      setSession(data.session);
+      setLoading(false);
+      return { error: null };
+    } catch (error) {
+      console.error('Unable to sign in:', error);
+      return { error: error instanceof Error ? error.message : 'Unable to sign in.' };
+    }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error('Unable to sign out:', error.message);
+      throw error;
+    }
   };
 
   return (
