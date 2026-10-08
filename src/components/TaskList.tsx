@@ -17,6 +17,10 @@ export default function TaskList({ courseId, title = 'Master To-Do List', accent
   const [dueDate, setDueDate] = useState('');
 
   const filtered = courseId ? tasks.filter((t) => t.course_id === courseId) : tasks;
+  const orderedTasks = [
+    ...filtered.filter((task) => !task.completed),
+    ...filtered.filter((task) => task.completed),
+  ];
 
   const handleAdd = async () => {
     if (!taskTitle.trim()) return;
@@ -80,7 +84,7 @@ export default function TaskList({ courseId, title = 'Master To-Do List', accent
         {filtered.length === 0 && (
           <p className="text-sm text-gray-600 text-center py-6">No tasks yet. Add one to get started!</p>
         )}
-        {filtered.map((t) => {
+        {orderedTasks.map((t) => {
           const course = t.course_id ? courseMap.get(t.course_id) : null;
           const typeColor = t.color ?? ITEM_TYPE_COLORS[t.item_type as ItemType] ?? ITEM_TYPE_COLORS.task;
           return (
