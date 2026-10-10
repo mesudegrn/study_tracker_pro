@@ -16,11 +16,14 @@ export default function TaskList({ courseId, title = 'Master To-Do List', accent
   const [taskTitle, setTitle] = useState('');
   const [dueDate, setDueDate] = useState('');
 
-  const filtered = courseId ? tasks.filter((t) => t.course_id === courseId) : tasks;
+  const filtered = courseId
+    ? tasks.filter((task) => task.course_id === courseId)
+    : tasks.filter((task) => task.item_type === 'task');
   const orderedTasks = [
     ...filtered.filter((task) => !task.completed),
     ...filtered.filter((task) => task.completed),
   ];
+  const isMasterList = !courseId;
 
   const handleAdd = async () => {
     if (!taskTitle.trim()) return;
@@ -38,7 +41,7 @@ export default function TaskList({ courseId, title = 'Master To-Do List', accent
   const courseMap = new Map(courses.map((c) => [c.id, c]));
 
   return (
-    <div className="bg-[#16161f] border border-white/5 rounded-2xl p-5">
+    <div className={`bg-[#16161f] border border-white/5 rounded-2xl p-5 ${isMasterList ? 'flex h-full flex-col' : ''}`}>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-white">{title}</h3>
         <button
@@ -80,7 +83,7 @@ export default function TaskList({ courseId, title = 'Master To-Do List', accent
         </div>
       )}
 
-      <div className="space-y-1.5 max-h-64 overflow-y-auto">
+      <div className={`space-y-1.5 overflow-y-auto ${isMasterList ? 'min-h-40 flex-1' : 'max-h-64'}`}>
         {filtered.length === 0 && (
           <p className="text-sm text-gray-600 text-center py-6">No tasks yet. Add one to get started!</p>
         )}
