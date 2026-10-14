@@ -11,6 +11,16 @@ interface Props {
 }
 
 const NEON_COLORS = ['#22d3ee', '#34d399', '#f59e0b', '#f472b6', '#a78bfa', '#fb7185', '#60a5fa', '#fbbf24'];
+const UNASSIGNED_KEY = 'course:unassigned';
+const UNKNOWN_KEY_PREFIX = 'course:unknown:';
+
+function fallbackCourseColor(courseId: string) {
+  let hash = 0;
+  for (let i = 0; i < courseId.length; i++) {
+    hash = (hash * 31 + courseId.charCodeAt(i)) >>> 0;
+  }
+  return NEON_COLORS[hash % NEON_COLORS.length];
+}
 
 export default function StudyAnalytics({ logs, courses, hideCoursePie = false, accentColor = '#22d3ee' }: Props) {
   const [range, setRange] = useState(7);
@@ -28,12 +38,12 @@ export default function StudyAnalytics({ logs, courses, hideCoursePie = false, a
       .map(([cid, min], i) => ({
         name: cid === 'none' ? 'Unassigned' : (courseMap.get(cid)?.name ?? 'Unknown'),
         value: min,
-        color: cid === 'none' ? '#64748b' : (courseMap.get(cid)?.color ?? NEON_COLORS[i % NEON_COLORS.length]),
+        color: cid === 'none' ? '#64748b' : (courseMap.get(cid)?.color ?? fallbackCourseColor(cid || String(i))),
       }));
   }, [logs, courseMap]);
 
-  const barData = useMemo(() => {
-    const days: { day: string; minutes: number; date: string }[] = [];
+  const { barData, barSeries } = useMemo(() => {
+    const days: ({ day: string; date: string } & Record<string, string | number>)[] = [];
     for (let i = range - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -41,15 +51,37 @@ export default function StudyAnalytics({ logs, courses, hideCoursePie = false, a
       days.push({
         day: d.toLocaleDateString('en-US', { weekday: 'short' }),
         date: iso,
-        minutes: 0,
       });
     }
+    const daysByDate = new Map(days.map((day) => [day.date, day]));
+    const totalsByKey = new Map<string, number>();
     for (const l of logs) {
-      const day = days.find((d) => d.date === l.log_date);
-      if (day) day.minutes += l.minutes;
+      const day = daysByDate.get(l.log_date);
+      if (!day) continue;
+      const key = l.course_id === null
+        ? UNASSIGNED_KEY
+        : courseMap.has(l.course_id)
+          ? `course:${l.course_id}`
+          : `${UNKNOWN_KEY_PREFIX}${l.course_id}`;
+      day[key] = (Number(day[key]) || 0) + l.minutes;
+      totalsByKey.set(key, (totalsByKey.get(key) ?? 0) + l.minutes);
     }
-    return days;
-  }, [logs, range]);
+
+    const series = courses.flatMap((course) => {
+      const key = `course:${course.id}`;
+      return totalsByKey.has(key) ? [{ key, name: course.name, color: course.color }] : [];
+    });
+    if (totalsByKey.has(UNASSIGNED_KEY)) {
+      series.push({ key: UNASSIGNED_KEY, name: 'Unassigned', color: '#64748b' });
+    }
+    for (const key of totalsByKey.keys()) {
+      if (key.startsWith(UNKNOWN_KEY_PREFIX)) {
+        const courseId = key.slice(UNKNOWN_KEY_PREFIX.length);
+        series.push({ key, name: 'Unknown', color: fallbackCourseColor(courseId) });
+      }
+    }
+    return { barData: days, barSeries: series };
+  }, [logs, range, courses, courseMap]);
 
   const totalMinutes = logs.reduce((s, l) => s + l.minutes, 0);
 
@@ -148,10 +180,29 @@ export default function StudyAnalytics({ logs, courses, hideCoursePie = false, a
               cursor={{ fill: 'rgba(34,211,238,0.05)' }}
               formatter={(v) => formatMinutes(Number(v))}
             />
-            <Bar dataKey="minutes" radius={[6, 6, 0, 0]} fill={accentColor} />
+            {barSeries.map((series) => (
+              <Bar
+                key={series.key}
+                dataKey={series.key}
+                name={series.name}
+                stackId="study-time"
+                fill={series.color}
+                radius={series === barSeries[barSeries.length - 1] ? [6, 6, 0, 0] : undefined}
+              />
+            ))}
           </BarChart>
         </ResponsiveContainer>
         </div>
+        {barSeries.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-3" aria-label="Study time by course legend">
+            {barSeries.map((series) => (
+              <div key={series.key} className="flex items-center gap-2 text-xs text-gray-400">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: series.color }} />
+                {series.name}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
